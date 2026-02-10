@@ -37,6 +37,7 @@ import { getServerAPISchemaAsync } from 'actions/server-actions';
 import { navigationActions } from 'actions/navigation-actions';
 import { CombinedState, NotificationsState, PluginsState } from './reducers';
 import './utils/dayjs-wrapper';
+import './utils/sam3_aa-wrapper/sam3_aa-wrapper';
 
 createCVATStore(createRootReducer);
 
