@@ -49,6 +49,40 @@ do trainings and a dedicated support with 24 hour SLA.
 - [Frequently asked questions](https://docs.cvat.ai/docs/faq/)
 - [Where to ask questions](#where-to-ask-questions)
 
+
+## Cherry-pick Sync Workflow
+
+This repository can include file mode-only diffs (`mode change`) in commits, which can make review and merge noisy.
+To keep functional updates and permission normalization separate, use two commit types.
+
+1) Commit split rule
+- Content commit: code, docs, configs, and feature changes.
+- Permission commit: executable bit normalization such as `100644 => 100755`.
+
+2) Apply updates from upstream without mixing semantics
+```bash
+git fetch origin
+git checkout develop
+git pull --rebase origin develop
+git checkout -b sync/my-task
+git cherry-pick <content-commit-sha>
+```
+
+3) Apply mode-only commit only when required
+```bash
+git cherry-pick <mode-only-commit-sha>
+```
+
+4) Before push
+```bash
+git status --short
+git diff --summary | grep 'mode change' || echo "mode change: none"
+```
+
+Operating principle
+- Upstream-sync branches should include content commits first.
+- Permission commits should be split and added only when necessary.
+
 ## Partners ❤️
 
 CVAT is used by teams all over the world. In the list, you can find key companies which
