@@ -36,6 +36,7 @@ type SegmentImageInstancesRequest = {
         prompt_variants: string[];
         priority: number;
     }>;
+    imgsz: number | null;
     conf_threshold: number;
     min_mask_area: number;
     max_instances_per_prompt: number;
@@ -373,6 +374,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
     #labelScope: LabelScope;
     #usePromptVariants: boolean;
     #overwriteAutoShapes: boolean;
+    #imgsz: number;
     #confThreshold: number;
     #minMaskArea: number;
     #maxInstancesPerLabel: number;
@@ -394,8 +396,9 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         this.#labelScope = 'vehicle-part labels only';
         this.#usePromptVariants = true;
         this.#overwriteAutoShapes = false;
+        this.#imgsz = 1008;
         this.#confThreshold = 0.08;
-        this.#minMaskArea = 100;
+        this.#minMaskArea = 500;
         this.#maxInstancesPerLabel = 0;
         this.#dedupIoUThreshold = 0.85;
         this.#groupingDilatePx = 24;
@@ -416,8 +419,9 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         this.#usePromptVariants = toBool(parameters['Use multi-prompt strategy'], true);
         this.#overwriteAutoShapes = toBool(parameters['Overwrite auto shapes on frame'], false);
 
+        this.#imgsz = Math.max(128, Math.round(toNumber(parameters['SAM3 imgsz'], 1008)));
         this.#confThreshold = toNumber(parameters['Conf threshold'], 0.08);
-        this.#minMaskArea = Math.max(0, Math.round(toNumber(parameters['Min mask area (px)'], 100)));
+        this.#minMaskArea = Math.max(0, Math.round(toNumber(parameters['Min mask area (px)'], 500)));
         this.#maxInstancesPerLabel = Math.max(0, Math.round(toNumber(parameters['Max instances / label (0=all)'], 0)));
         this.#dedupIoUThreshold = toNumber(parameters['Dedup IoU threshold'], 0.85);
         this.#groupingDilatePx = Math.max(0, Math.round(toNumber(parameters['Grouping dilate px'], 24)));
@@ -494,6 +498,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
                 prompt_variants: prompt.prompt_variants,
                 priority: prompt.priority,
             })),
+            imgsz: Number.isFinite(this.#imgsz) ? this.#imgsz : null,
             conf_threshold: this.#confThreshold,
             min_mask_area: this.#minMaskArea,
             max_instances_per_prompt: this.#maxInstancesPerLabel,
@@ -645,6 +650,11 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
                 values: ['true', 'false'],
                 defaultValue: 'false',
             },
+            'SAM3 imgsz': {
+                type: ActionParameterType.NUMBER,
+                values: ['128', '4096', '8'],
+                defaultValue: '1008',
+            },
             'Conf threshold': {
                 type: ActionParameterType.NUMBER,
                 values: ['0', '1', '0.01'],
@@ -653,7 +663,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
             'Min mask area (px)': {
                 type: ActionParameterType.NUMBER,
                 values: ['0', '200000', '10'],
-                defaultValue: '100',
+                defaultValue: '500',
             },
             'Max instances / label (0=all)': {
                 type: ActionParameterType.NUMBER,
