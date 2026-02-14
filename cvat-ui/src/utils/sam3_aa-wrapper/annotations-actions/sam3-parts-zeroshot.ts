@@ -396,19 +396,19 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         this.#labelScope = 'vehicle-part labels only';
         this.#usePromptVariants = true;
         this.#overwriteAutoShapes = false;
-        this.#imgsz = 1008;
-        this.#confThreshold = 0.08;
+        this.#imgsz = 1400;
+        this.#confThreshold = 0.5;
         this.#minMaskArea = 500;
         this.#maxInstancesPerLabel = 0;
         this.#dedupIoUThreshold = 0.85;
         this.#groupingDilatePx = 24;
-        this.#polySimplifyEpsRatio = 0.003;
+        this.#polySimplifyEpsRatio = 0.0008;
         this.#polySimplifyEpsMin = 1.0;
         this.#polyMinArea = 16.0;
         this.#polyMaxPoints = 0;
         this.#polyDensifyMaxEdgeLength = 0;
         this.#polyChainApprox = 'simple';
-        this.#fillHoles = false;
+        this.#fillHoles = true;
         this.#removeSmallComponentsMinArea = 0;
     }
 
@@ -419,21 +419,21 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         this.#usePromptVariants = toBool(parameters['Use multi-prompt strategy'], true);
         this.#overwriteAutoShapes = toBool(parameters['Overwrite auto shapes on frame'], false);
 
-        this.#imgsz = Math.max(128, Math.round(toNumber(parameters['SAM3 imgsz'], 1008)));
-        this.#confThreshold = toNumber(parameters['Conf threshold'], 0.08);
+        this.#imgsz = Math.max(128, Math.round(toNumber(parameters['SAM3 imgsz'], 1400)));
+        this.#confThreshold = toNumber(parameters['Conf threshold'], 0.5);
         this.#minMaskArea = Math.max(0, Math.round(toNumber(parameters['Min mask area (px)'], 500)));
         this.#maxInstancesPerLabel = Math.max(0, Math.round(toNumber(parameters['Max instances / label (0=all)'], 0)));
         this.#dedupIoUThreshold = toNumber(parameters['Dedup IoU threshold'], 0.85);
         this.#groupingDilatePx = Math.max(0, Math.round(toNumber(parameters['Grouping dilate px'], 24)));
 
-        this.#polySimplifyEpsRatio = toNumber(parameters['Polygon simplify eps ratio'], 0.003);
+        this.#polySimplifyEpsRatio = toNumber(parameters['Polygon simplify eps ratio'], 0.0008);
         this.#polySimplifyEpsMin = toNumber(parameters['Polygon simplify eps min'], 1.0);
         this.#polyMinArea = Math.max(0, toNumber(parameters['Polygon min area'], 16.0));
         this.#polyMaxPoints = Math.max(0, Math.round(toNumber(parameters['Polygon max points (0=none)'], 0)));
         this.#polyDensifyMaxEdgeLength = Math.max(0, toNumber(parameters['Polygon densify max edge (0=none)'], 0));
         this.#polyChainApprox = String(parameters['Polygon chain approx'] || 'simple') as ChainApprox;
 
-        this.#fillHoles = toBool(parameters['Fill holes'], false);
+        this.#fillHoles = toBool(parameters['Fill holes'], true);
         this.#removeSmallComponentsMinArea = Math.max(0, Math.round(
             toNumber(parameters['Remove small components area (px)'], 0),
         ));
@@ -653,12 +653,12 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
             'SAM3 imgsz': {
                 type: ActionParameterType.NUMBER,
                 values: ['128', '4096', '8'],
-                defaultValue: '1008',
+                defaultValue: '1400',
             },
             'Conf threshold': {
                 type: ActionParameterType.NUMBER,
                 values: ['0', '1', '0.01'],
-                defaultValue: '0.08',
+                defaultValue: '0.5',
             },
             'Min mask area (px)': {
                 type: ActionParameterType.NUMBER,
@@ -683,7 +683,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
             'Polygon simplify eps ratio': {
                 type: ActionParameterType.NUMBER,
                 values: ['0', '0.1', '0.0005'],
-                defaultValue: '0.003',
+                defaultValue: '0.0008',
             },
             'Polygon simplify eps min': {
                 type: ActionParameterType.NUMBER,
@@ -713,7 +713,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
             'Fill holes': {
                 type: ActionParameterType.CHECKBOX,
                 values: ['true', 'false'],
-                defaultValue: 'false',
+                defaultValue: 'true',
             },
             'Remove small components area (px)': {
                 type: ActionParameterType.NUMBER,
