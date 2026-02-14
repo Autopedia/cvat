@@ -399,17 +399,17 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         this.#imgsz = 1400;
         this.#confThreshold = 0.5;
         this.#minMaskArea = 500;
-        this.#maxInstancesPerLabel = 0;
+        this.#maxInstancesPerLabel = 2;
         this.#dedupIoUThreshold = 0.85;
         this.#groupingDilatePx = 24;
         this.#polySimplifyEpsRatio = 0.0008;
-        this.#polySimplifyEpsMin = 1.0;
+        this.#polySimplifyEpsMin = 3.0;
         this.#polyMinArea = 16.0;
         this.#polyMaxPoints = 0;
         this.#polyDensifyMaxEdgeLength = 0;
         this.#polyChainApprox = 'simple';
         this.#fillHoles = true;
-        this.#removeSmallComponentsMinArea = 0;
+        this.#removeSmallComponentsMinArea = 3000;
     }
 
     public async init(instance: Job | Task, parameters: Record<string, string | number>): Promise<void> {
@@ -422,12 +422,12 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         this.#imgsz = Math.max(128, Math.round(toNumber(parameters['SAM3 imgsz'], 1400)));
         this.#confThreshold = toNumber(parameters['Conf threshold'], 0.5);
         this.#minMaskArea = Math.max(0, Math.round(toNumber(parameters['Min mask area (px)'], 500)));
-        this.#maxInstancesPerLabel = Math.max(0, Math.round(toNumber(parameters['Max instances / label (0=all)'], 0)));
+        this.#maxInstancesPerLabel = Math.max(0, Math.round(toNumber(parameters['Max instances / label (0=all)'], 2)));
         this.#dedupIoUThreshold = toNumber(parameters['Dedup IoU threshold'], 0.85);
         this.#groupingDilatePx = Math.max(0, Math.round(toNumber(parameters['Grouping dilate px'], 24)));
 
         this.#polySimplifyEpsRatio = toNumber(parameters['Polygon simplify eps ratio'], 0.0008);
-        this.#polySimplifyEpsMin = toNumber(parameters['Polygon simplify eps min'], 1.0);
+        this.#polySimplifyEpsMin = toNumber(parameters['Polygon simplify eps min'], 3.0);
         this.#polyMinArea = Math.max(0, toNumber(parameters['Polygon min area'], 16.0));
         this.#polyMaxPoints = Math.max(0, Math.round(toNumber(parameters['Polygon max points (0=none)'], 0)));
         this.#polyDensifyMaxEdgeLength = Math.max(0, toNumber(parameters['Polygon densify max edge (0=none)'], 0));
@@ -435,7 +435,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
 
         this.#fillHoles = toBool(parameters['Fill holes'], true);
         this.#removeSmallComponentsMinArea = Math.max(0, Math.round(
-            toNumber(parameters['Remove small components area (px)'], 0),
+            toNumber(parameters['Remove small components area (px)'], 3000),
         ));
     }
 
@@ -668,7 +668,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
             'Max instances / label (0=all)': {
                 type: ActionParameterType.NUMBER,
                 values: ['0', '100', '1'],
-                defaultValue: '0',
+                defaultValue: '2',
             },
             'Dedup IoU threshold': {
                 type: ActionParameterType.NUMBER,
@@ -688,7 +688,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
             'Polygon simplify eps min': {
                 type: ActionParameterType.NUMBER,
                 values: ['0', '20', '0.1'],
-                defaultValue: '1.0',
+                defaultValue: '3.0',
             },
             'Polygon min area': {
                 type: ActionParameterType.NUMBER,
@@ -718,7 +718,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
             'Remove small components area (px)': {
                 type: ActionParameterType.NUMBER,
                 values: ['0', '100000', '10'],
-                defaultValue: '0',
+                defaultValue: '3000',
             },
         };
     }
