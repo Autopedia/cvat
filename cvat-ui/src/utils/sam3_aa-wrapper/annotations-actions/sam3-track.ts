@@ -25,11 +25,55 @@ function normalizeBaseURL(url: string): string {
     return url.replace(/\/+$/, '');
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+    const h = (hostname || '').trim().toLowerCase();
+    return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0';
+}
+
+function isIPv4Hostname(hostname: string): boolean {
+    const h = (hostname || '').trim();
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(h);
+}
+
+function inferDefaultSam3AAURL(): string {
+    const hostname = window.location.hostname || '127.0.0.1';
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+    // By default, call sam3_aa on the same host as CVAT, but on the sam3_aa port.
+    // (Users can still override via localStorage for custom setups.)
+    return `${protocol}://${hostname}:8089`;
+}
+
 function getSam3AAURL(): string {
     // This is intentionally local-storage based to avoid CVAT backend changes for an MVP.
     // Example:
-    //   localStorage.setItem('cvat.sam3_aa.url', 'http://127.0.0.1:8001')
-    return normalizeBaseURL(window.localStorage.getItem('cvat.sam3_aa.url') || 'http://127.0.0.1:8001');
+    //   localStorage.setItem('cvat.sam3_aa.url', 'http://<TAILSCALE_IP>:8089')
+    const stored = window.localStorage.getItem('cvat.sam3_aa.url');
+    const currentHostname = window.location.hostname || '';
+    if (stored && stored.trim()) {
+        try {
+            const storedURL = new URL(stored);
+            // If CVAT is accessed remotely, ignore stale overrides that break remote access:
+            // - loopback (127.0.0.1/localhost)
+            // - old fixed Tailscale IP when CVAT host IP changes
+            const remoteCVAT = !isLoopbackHostname(currentHostname);
+            const staleLoopback = remoteCVAT && isLoopbackHostname(storedURL.hostname);
+            const staleOldIP = remoteCVAT &&
+                isIPv4Hostname(currentHostname) &&
+                isIPv4Hostname(storedURL.hostname) &&
+                storedURL.hostname !== currentHostname;
+            if (staleLoopback || staleOldIP) {
+                window.localStorage.removeItem('cvat.sam3_aa.url');
+                // eslint-disable-next-line no-console
+                console.warn(`Ignoring and clearing localStorage['cvat.sam3_aa.url']=${stored} for remote CVAT host=${currentHostname}`);
+            } else {
+                return normalizeBaseURL(stored);
+            }
+        } catch (_err: any) {
+            // Ignore invalid overrides.
+        }
+    }
+
+    return normalizeBaseURL(inferDefaultSam3AAURL());
 }
 
 async function blobToB64(blob: Blob): Promise<string> {
