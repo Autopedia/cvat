@@ -1,0 +1,68 @@
+services:
+  cvat_server:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_utils:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+
+  cvat_worker_import:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_export:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_annotation:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_webhooks:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+
+  cvat_worker_quality_reports:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+
+  cvat_worker_chunks:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_consensus:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_data:/home/django/data:rw
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+
+  cvat_redis_ondisk:
+    volumes:
+      - /mnt/dataset/cvat-volume/container-volumes/cvat_cache_db:/var/lib/kvrocks

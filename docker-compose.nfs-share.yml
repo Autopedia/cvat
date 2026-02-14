@@ -1,0 +1,33 @@
+services:
+  cvat_server:
+    volumes:
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_import:
+    volumes:
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_export:
+    volumes:
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_annotation:
+    volumes:
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+  cvat_worker_chunks:
+    volumes:
+      - cvat_share:/home/django/share:rw
+      - /mnt/dataset/exterior-scanner:/home/django/share/exterior-scanner:rw
+
+volumes:
+  cvat_share:
+    driver: local
+    driver_opts:
+      type: none
+      device: /mnt/dataset/cvat-volume/share
+      o: bind

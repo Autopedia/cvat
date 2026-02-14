@@ -37,6 +37,16 @@ do trainings and a dedicated support with 24 hour SLA.
 
 ## Quick start ⚡
 
+## Local NFS deployment notes (custom)
+
+- This environment mounts shared data from NFS without copying.
+- Share path (`/home/django/share`) is mapped to `/mnt/dataset/cvat-volume/share` via `cvat/docker-compose.nfs-share.yml`.
+- CVAT data path (`/home/django/data`) is mapped to `/mnt/dataset/cvat-volume/container-volumes/cvat_data` via `cvat/docker-compose.nfs-volumes.yml`.
+- Redis on-disk cache (`/var/lib/kvrocks`) is mapped to `/mnt/dataset/cvat-volume/container-volumes/cvat_cache_db` via `cvat/docker-compose.nfs-volumes.yml`.
+- Re-run with:
+  - `cd /raid/projects/cvat_atrace/cvat`
+  - `docker compose -f docker-compose.yml -f docker-compose.nfs-share.yml -f docker-compose.nfs-volumes.yml up -d --remove-orphans`
+
 - [Installation guide](https://docs.cvat.ai/docs/administration/basics/installation/)
 - [Manual](https://docs.cvat.ai/docs/manual/)
 - [Contributing](https://docs.cvat.ai/docs/contributing/)
