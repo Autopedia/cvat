@@ -13,6 +13,7 @@ import {
 
 type Collection = Parameters<BaseCollectionAction['run']>[0]['collection'];
 type Shape = Collection['shapes'][0];
+type Track = Collection['tracks'][0];
 
 type OutputShape = 'polygon' | 'rectangle';
 type LabelScope = 'vehicle-part labels only' | 'all shape labels';
@@ -214,6 +215,12 @@ const CANONICAL_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
     { canonical: 'roof', aliases: ['roof'] },
 ];
 
+const MODEL_PART_CLASSES = CANONICAL_ALIASES.map((row) => row.canonical);
+
+function partParamKey(canonical: string): string {
+    return `Part: ${canonical}`;
+}
+
 const PROMPTS_BY_CANONICAL: Record<string, string[]> = {
     front_bumper: ['car front bumper', 'front bumper of a car'],
     rear_bumper: ['car rear bumper', 'rear bumper of a car'],
@@ -285,20 +292,6 @@ function canCreateShapesForLabelType(labelType: string): boolean {
     return true;
 }
 
-function shouldIncludeLabelByScope(labelName: string, labelScope: LabelScope): boolean {
-    if (labelScope === 'all shape labels') {
-        return true;
-    }
-
-    const canonical = inferCanonicalPart(labelName);
-    if (canonical) {
-        return true;
-    }
-
-    const normalized = normalizeLabelName(labelName);
-    return normalized.includes('vehicle') || normalized.includes('car');
-}
-
 function toNumber(value: string | number | undefined, defaultValue: number): number {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     const parsed = Number(value);
@@ -339,19 +332,54 @@ function polygonToRectangle(polyPoints: number[]): number[] {
     return [Math.round(minX), Math.round(minY), Math.round(maxX), Math.round(maxY)];
 }
 
+async function getNextFrameNumber(instance: Job | Task, currentFrame: number): Promise<number | null> {
+    try {
+        const frameNumbers = instance instanceof Job ?
+            (await instance.frames.frameNumbers()).slice().sort((a, b) => a - b) :
+            Array.from({ length: instance.size }, (_v, i) => i);
+
+        for (const f of frameNumbers) {
+            if (f > currentFrame) return f;
+        }
+    } catch (_err: any) {
+        // Fall back to a simple heuristic if frame listing isn't available.
+        const next = currentFrame + 1;
+        if (!(instance instanceof Job) && next < instance.size) {
+            return next;
+        }
+    }
+
+    return null;
+}
+
+function isTrackActiveAtFrame(track: Track, frame: number): boolean {
+    if (!track?.shapes?.length) return false;
+    const shapesBefore = track.shapes
+        .filter((shape) => shape.frame <= frame)
+        .sort((a, b) => a.frame - b.frame);
+    if (!shapesBefore.length) return false;
+    return !shapesBefore[shapesBefore.length - 1].outside;
+}
+
 function buildPromptPayloads(
     labels: Array<{ id?: number; name: string; type: string; hasParent?: boolean }>,
     labelScope: LabelScope,
     usePromptVariants: boolean,
+    enabledCanonicalParts: Set<string>,
 ): PromptPayload[] {
     const prompts: PromptPayload[] = [];
     for (const label of labels) {
         if (!Number.isInteger(label.id)) continue;
         if (label.hasParent) continue;
         if (!canCreateShapesForLabelType(label.type)) continue;
-        if (!shouldIncludeLabelByScope(label.name, labelScope)) continue;
-
         const canonical = inferCanonicalPart(label.name);
+        if (canonical) {
+            if (!enabledCanonicalParts.has(canonical)) continue;
+        } else if (labelScope !== 'all shape labels') {
+            // If the label is not a known vehicle-part class, include it only when explicitly requested.
+            continue;
+        }
+
         const variants = defaultPromptVariantsForLabel(label.name, canonical);
         if (!variants.length) continue;
 
@@ -374,6 +402,8 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
     #labelScope: LabelScope;
     #usePromptVariants: boolean;
     #overwriteAutoShapes: boolean;
+    #autoEndTrackOnNextFrame: boolean;
+    #enabledCanonicalParts: Set<string>;
     #imgsz: number;
     #confThreshold: number;
     #minMaskArea: number;
@@ -396,6 +426,8 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         this.#labelScope = 'vehicle-part labels only';
         this.#usePromptVariants = true;
         this.#overwriteAutoShapes = false;
+        this.#autoEndTrackOnNextFrame = false;
+        this.#enabledCanonicalParts = new Set<string>(MODEL_PART_CLASSES);
         this.#imgsz = 1400;
         this.#confThreshold = 0.5;
         this.#minMaskArea = 500;
@@ -418,6 +450,18 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         this.#labelScope = String(parameters['Label scope'] || 'vehicle-part labels only') as LabelScope;
         this.#usePromptVariants = toBool(parameters['Use multi-prompt strategy'], true);
         this.#overwriteAutoShapes = toBool(parameters['Overwrite auto shapes on frame'], false);
+        this.#autoEndTrackOnNextFrame = toBool(parameters['Auto-end track on next frame (outside=true)'], false);
+
+        const enabledParts = new Set<string>();
+        for (const canonical of MODEL_PART_CLASSES) {
+            if (toBool(parameters[partParamKey(canonical)], true)) {
+                enabledParts.add(canonical);
+            }
+        }
+        if (!enabledParts.size) {
+            throw new Error('No vehicle-part classes selected. Select at least one Part:* checkbox and retry.');
+        }
+        this.#enabledCanonicalParts = enabledParts;
 
         this.#imgsz = Math.max(128, Math.round(toNumber(parameters['SAM3 imgsz'], 1400)));
         this.#confThreshold = toNumber(parameters['Conf threshold'], 0.5);
@@ -467,6 +511,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
             (instance.labels || []) as Array<{ id?: number; name: string; type: string; hasParent?: boolean }>,
             this.#labelScope,
             this.#usePromptVariants,
+            this.#enabledCanonicalParts,
         );
         if (!prompts.length) {
             throw new Error(
@@ -549,10 +594,11 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         }
 
         if (cancelled()) return noChanges;
-        onProgress('Building shapes', 78);
+        onProgress('Building tracks', 78);
 
         const promptLabelIDs = new Set<number>(prompts.map((p) => p.id));
-        const createdShapes: Shape[] = [];
+        const createdTracks: Track[] = [];
+        const nextFrame = this.#autoEndTrackOnNextFrame ? await getNextFrameNumber(instance, currentFrame) : null;
         for (const [index, item] of (responseData.results || []).entries()) {
             const labelID = typeof item.id === 'number' ? item.id : Number(item.id);
             if (!Number.isInteger(labelID) || !promptLabelIDs.has(labelID)) {
@@ -575,7 +621,8 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
                 continue;
             }
 
-            createdShapes.push({
+            const group = Number.isInteger(item.vehicle_group) ? item.vehicle_group : 0;
+            const shapes = [{
                 type: this.#outputShape,
                 frame: currentFrame,
                 attributes: [],
@@ -584,18 +631,46 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
                 points,
                 rotation: 0,
                 z_order: index,
-                group: Number.isInteger(item.vehicle_group) ? item.vehicle_group : 0,
-                label_id: labelID,
+            }];
+
+            // Optional: auto-end on the next frame (legacy behavior).
+            if (this.#autoEndTrackOnNextFrame && Number.isInteger(nextFrame)) {
+                shapes.push({
+                    type: this.#outputShape,
+                    frame: nextFrame as number,
+                    attributes: [],
+                    occluded: false,
+                    outside: true,
+                    points,
+                    rotation: 0,
+                    z_order: index,
+                });
+            }
+
+            createdTracks.push({
                 source: Source.AUTO,
-            } as Shape);
+                attributes: [],
+                elements: [],
+                frame: currentFrame,
+                group,
+                label_id: labelID,
+                shapes,
+            } as Track);
         }
 
         let deletedShapes: Shape[] = [];
+        let deletedTracks: Track[] = [];
         if (this.#overwriteAutoShapes) {
             deletedShapes = collection.shapes.filter((shape) => (
                 shape.frame === currentFrame &&
                 promptLabelIDs.has(shape.label_id) &&
                 shape.source === Source.AUTO
+            ));
+
+            deletedTracks = collection.tracks.filter((track) => (
+                promptLabelIDs.has(track.label_id) &&
+                track.source === Source.AUTO &&
+                isTrackActiveAtFrame(track, currentFrame)
             ));
         }
 
@@ -603,8 +678,8 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         onProgress('Committing', 95);
 
         return {
-            created: { shapes: createdShapes, tags: [], tracks: [] },
-            deleted: { shapes: deletedShapes, tags: [], tracks: [] },
+            created: { shapes: [], tags: [], tracks: createdTracks },
+            deleted: { shapes: deletedShapes, tags: [], tracks: deletedTracks },
         };
     }
 
@@ -612,10 +687,15 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
         input: Parameters<BaseCollectionAction['applyFilter']>[0],
     ): ReturnType<BaseCollectionAction['applyFilter']> {
         const { collection, frameData } = input;
+        const supportedTypes = new Set<string>(['polygon', 'rectangle']);
         return {
             shapes: collection.shapes.filter((shape) => shape.frame === frameData.number),
             tags: [],
-            tracks: [],
+            tracks: collection.tracks.filter((track) => (
+                Boolean(track?.shapes?.length) &&
+                supportedTypes.has(track.shapes[0].type) &&
+                isTrackActiveAtFrame(track, frameData.number)
+            )),
         };
     }
 
@@ -629,6 +709,15 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
     }
 
     public get parameters(): BaseCollectionAction['parameters'] {
+        const partParams: BaseCollectionAction['parameters'] = {};
+        for (const canonical of MODEL_PART_CLASSES) {
+            partParams[partParamKey(canonical)] = {
+                type: ActionParameterType.CHECKBOX,
+                values: ['true', 'false'],
+                defaultValue: 'true',
+            };
+        }
+
         return {
             'Output shape': {
                 type: ActionParameterType.SELECT,
@@ -646,6 +735,11 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
                 defaultValue: 'true',
             },
             'Overwrite auto shapes on frame': {
+                type: ActionParameterType.CHECKBOX,
+                values: ['true', 'false'],
+                defaultValue: 'false',
+            },
+            'Auto-end track on next frame (outside=true)': {
                 type: ActionParameterType.CHECKBOX,
                 values: ['true', 'false'],
                 defaultValue: 'false',
@@ -720,6 +814,7 @@ export default class Sam3PartsZeroShotAction extends BaseCollectionAction {
                 values: ['0', '100000', '10'],
                 defaultValue: '3000',
             },
+            ...partParams,
         };
     }
 }
