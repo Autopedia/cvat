@@ -370,7 +370,6 @@ function buildPromptPayloads(
     const prompts: PromptPayload[] = [];
     for (const label of labels) {
         if (!Number.isInteger(label.id)) continue;
-        if (label.hasParent) continue;
         if (!canCreateShapesForLabelType(label.type)) continue;
         const canonical = inferCanonicalPart(label.name);
         if (canonical) {
