@@ -11,6 +11,8 @@ x-backend-env: &backend-env
   CVAT_REDIS_INMEM_PORT: 6379
   CVAT_REDIS_ONDISK_HOST: cvat_redis_ondisk
   CVAT_REDIS_ONDISK_PORT: 6666
+  CVAT_SERVERLESS: '${CVAT_SERVERLESS:-true}'
+  CVAT_NUCLIO_INVOKE_METHOD: '${CVAT_NUCLIO_INVOKE_METHOD:-dashboard}'
   CVAT_LOG_IMPORT_ERRORS: 'true'
   CVAT_ALLOW_STATIC_CACHE: '${CVAT_ALLOW_STATIC_CACHE:-no}'
   # CVAT UI calls /api/server/health and expects HTTP 200. If disk usage exceeds
