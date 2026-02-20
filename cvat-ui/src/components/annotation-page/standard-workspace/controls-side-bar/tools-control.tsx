@@ -34,6 +34,7 @@ import openCVWrapper, { MatType } from 'utils/opencv-wrapper/opencv-wrapper';
 import {
     CombinedState, ActiveControl, ToolsBlockerState, PluginComponent,
 } from 'reducers';
+import GlobalHotKeys, { KeyMap } from 'utils/mousetrap-react';
 import {
     interactWithCanvas,
     switchNavigationBlocked as switchNavigationBlockedAction,
@@ -41,6 +42,9 @@ import {
     updateAnnotationsAsync,
     createAnnotationsAsync,
 } from 'actions/annotation-actions';
+import { registerComponentShortcuts } from 'actions/shortcuts-actions';
+import { ShortcutScope } from 'utils/enums';
+import { subKeyMap } from 'utils/component-subkeymap';
 import DetectorRunner, { AnnotateTaskRequestBody } from 'components/model-runner-modal/detector-runner';
 import LabelSelector from 'components/label-selector/label-selector';
 import CVATTooltip from 'components/common/cvat-tooltip';
@@ -69,6 +73,7 @@ interface StateToProps {
     toolsBlockerState: ToolsBlockerState;
     frameIsDeleted: boolean;
     interactorExtras: PluginComponent[];
+    keyMap: KeyMap;
 }
 
 interface DispatchToProps {
@@ -83,6 +88,23 @@ interface DispatchToProps {
 const MIN_SUPPORTED_INTERACTOR_VERSION = 2;
 const core = getCore();
 const CustomPopover = withVisibilityHandling(Popover, 'tools-control');
+
+const componentShortcuts = {
+    OPEN_AI_TOOLS_STANDARD_CONTROLS: {
+        name: 'Open AI tools',
+        description: 'Open AI tools panel (Magic Wand)',
+        sequences: ['w'],
+        scope: ShortcutScope.STANDARD_WORKSPACE_CONTROLS,
+    },
+    AI_TOOLS_INTERACT_TOGGLE_STANDARD_CONTROLS: {
+        name: 'AI tools interact toggle',
+        description: 'Toggle AI tools panel / start Interact',
+        sequences: ['e'],
+        scope: ShortcutScope.STANDARD_WORKSPACE_CONTROLS,
+    },
+};
+
+registerComponentShortcuts(componentShortcuts);
 
 function mapStateToProps(state: CombinedState): StateToProps {
     const {
@@ -113,6 +135,7 @@ function mapStateToProps(state: CombinedState): StateToProps {
                 },
             },
         },
+        shortcuts: { keyMap },
     } = state;
 
     return {
@@ -131,6 +154,7 @@ function mapStateToProps(state: CombinedState): StateToProps {
         toolsBlockerState,
         frameIsDeleted,
         interactorExtras,
+        keyMap,
     };
 }
 
@@ -163,6 +187,7 @@ interface State {
     approxPolyAccuracy: number;
     mode: 'detection' | 'interaction' | 'tracking';
     portals: React.ReactPortal[];
+    toolsPopoverVisible: boolean;
 }
 
 type DetectorResults = Extract<Awaited<ReturnType<typeof core.lambda.call>>, { version: number }>;
@@ -262,6 +287,7 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
             pointsReceived: false,
             mode: 'interaction',
             portals: [],
+            toolsPopoverVisible: false,
         };
 
         this.interaction = {
@@ -326,6 +352,7 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
             this.setState({
                 approxPolyAccuracy: defaultApproxPolyAccuracy,
                 pointsReceived: false,
+                toolsPopoverVisible: false,
             });
             window.addEventListener('contextmenu', this.contextmenuDisabler);
         }
@@ -590,6 +617,59 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
         if (mode === 'tracking') {
             await this.onTracking(e);
         }
+    };
+
+    private startInteractor = (): void => {
+        const { canvasInstance, labels, onInteractionStart } = this.props;
+        const {
+            activeInteractor, activeLabelID, fetching, startInteractingWithBox,
+        } = this.state;
+
+        if (!activeInteractor || activeLabelID === null || !labels.length || fetching) {
+            return;
+        }
+        if (activeInteractor.version < MIN_SUPPORTED_INTERACTOR_VERSION) {
+            return;
+        }
+
+        this.setState({
+            mode: 'interaction',
+            toolsPopoverVisible: false,
+        });
+        canvasInstance.cancel();
+        const interactorParameters = {
+            ...omit(activeInteractor.params.canvas, 'startWithBoxOptional'),
+            ...(activeInteractor.params.canvas.startWithBoxOptional ? {
+                startWithBox: startInteractingWithBox,
+            } : {
+                startWithBox: activeInteractor.params.canvas.startWithBox,
+            }),
+        };
+
+        canvasInstance.interact({ shapeType: 'points', enabled: true, ...interactorParameters });
+        onInteractionStart(activeInteractor, activeLabelID, interactorParameters);
+    };
+
+    private openAIToolsPopover = (): void => {
+        const { isActivated } = this.props;
+        if (isActivated) {
+            return;
+        }
+        this.setState({ toolsPopoverVisible: true });
+    };
+
+    private handleAIToolsInteractToggle = (): void => {
+        const { isActivated } = this.props;
+        const { toolsPopoverVisible } = this.state;
+
+        // Toggle behavior:
+        // - closed -> open
+        // - opened (or already in AI tools mode) -> start Interact
+        if (!isActivated && !toolsPopoverVisible) {
+            this.setState({ toolsPopoverVisible: true });
+            return;
+        }
+        this.startInteractor();
     };
 
     private setActiveInteractor = (value: string): void => {
@@ -1069,7 +1149,7 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
 
     private renderInteractorBlock(): JSX.Element {
         const {
-            interactors, canvasInstance, labels, onInteractionStart, interactorExtras,
+            interactors, interactorExtras,
         } = this.props;
         const {
             activeInteractor, activeLabelID, fetching, startInteractingWithBox, convertMasksToPolygons,
@@ -1171,25 +1251,9 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
                             className='cvat-tools-interact-button'
                             disabled={!activeInteractor ||
                                 fetching ||
+                                activeLabelID === null ||
                                 activeInteractor.version < MIN_SUPPORTED_INTERACTOR_VERSION}
-                            onClick={() => {
-                                if (activeInteractor && activeLabelID && labels.length) {
-                                    this.setState({ mode: 'interaction' });
-                                    canvasInstance.cancel();
-                                    const interactorParameters = {
-                                        ...omit(activeInteractor.params.canvas, 'startWithBoxOptional'),
-                                        // replace 'optional' with true or false depending on user specified setting
-                                        ...(activeInteractor.params.canvas.startWithBoxOptional ? {
-                                            startWithBox: startInteractingWithBox,
-                                        } : {
-                                            startWithBox: activeInteractor.params.canvas.startWithBox,
-                                        }),
-                                    };
-
-                                    canvasInstance.interact({ shapeType: 'points', enabled: true, ...interactorParameters });
-                                    onInteractionStart(activeInteractor, activeLabelID, interactorParameters);
-                                }
-                            }}
+                            onClick={this.startInteractor}
                         >
                             Interact
                         </Button>
@@ -1344,10 +1408,10 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
 
     public render(): JSX.Element | null {
         const {
-            interactors, detectors, trackers, isActivated, canvasInstance, labels, frameIsDeleted,
+            interactors, detectors, trackers, isActivated, canvasInstance, labels, frameIsDeleted, keyMap,
         } = this.props;
         const {
-            fetching, approxPolyAccuracy, pointsReceived, mode, portals, convertMasksToPolygons,
+            fetching, approxPolyAccuracy, pointsReceived, mode, portals, convertMasksToPolygons, toolsPopoverVisible,
         } = this.state;
 
         if (![...interactors, ...detectors, ...trackers].length) return null;
@@ -1357,8 +1421,14 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
                 overlayStyle: {
                     display: 'none',
                 },
+                open: false,
             } :
-            {};
+            {
+                open: toolsPopoverVisible,
+                onOpenChange: (visible: boolean): void => {
+                    this.setState({ toolsPopoverVisible: visible });
+                },
+            };
 
         const dynamicIconProps = isActivated ?
             {
@@ -1370,6 +1440,17 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
             {
                 className: 'cvat-tools-control',
             };
+
+        const shortcutHandlers: Record<keyof typeof componentShortcuts, (event?: KeyboardEvent) => void> = {
+            OPEN_AI_TOOLS_STANDARD_CONTROLS: (event: KeyboardEvent | undefined): void => {
+                if (event) event.preventDefault();
+                this.openAIToolsPopover();
+            },
+            AI_TOOLS_INTERACT_TOGGLE_STANDARD_CONTROLS: (event: KeyboardEvent | undefined): void => {
+                if (event) event.preventDefault();
+                this.handleAIToolsInteractToggle();
+            },
+        };
 
         const showAnyContent = labels.length && !frameIsDeleted;
         const showInteractionContent = isActivated && mode === 'interaction' && pointsReceived && convertMasksToPolygons;
@@ -1400,6 +1481,7 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
 
         return showAnyContent ? (
             <>
+                <GlobalHotKeys keyMap={subKeyMap(componentShortcuts, keyMap)} handlers={shortcutHandlers} />
                 <CustomPopover {...dynamicPopoverProps} placement='right' content={this.renderPopoverContent()}>
                     <Icon {...dynamicIconProps} component={AIToolsIcon} />
                 </CustomPopover>
