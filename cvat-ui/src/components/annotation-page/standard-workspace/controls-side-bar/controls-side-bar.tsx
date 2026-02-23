@@ -80,7 +80,13 @@ const componentShortcuts = {
         name: 'Draw mode',
         description:
             'Repeat the latest procedure of drawing with the same parameters',
-        sequences: ['n'],
+        sequences: ['n', 'a'],
+        scope: ShortcutScope.STANDARD_WORKSPACE_CONTROLS,
+    },
+    DRAW_RECTANGLE_SHAPE_STANDARD_CONTROLS: {
+        name: 'Draw rectangle shape',
+        description: 'Press once to open rectangle options, press again to start rectangle shape drawing',
+        sequences: ['r'],
         scope: ShortcutScope.STANDARD_WORKSPACE_CONTROLS,
     },
     SWITCH_REDRAW_MODE_STANDARD_CONTROLS: {
@@ -182,6 +188,42 @@ export default function ControlsSideBarComponent(props: Props): JSX.Element {
     const preventDefault = (event: KeyboardEvent | undefined): void => {
         if (event) {
             event.preventDefault();
+        }
+    };
+
+    const isVisibleElement = (element: Element | null): element is HTMLElement => (
+        element instanceof HTMLElement &&
+        !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length)
+    );
+
+    const triggerRectangleShapeShortcut = (event: KeyboardEvent | undefined): void => {
+        preventDefault(event);
+        const rectangleShapeButton = window.document.querySelector(
+            '.cvat-draw-rectangle-popover .cvat-draw-rectangle-shape-button',
+        ) as HTMLButtonElement | null;
+        if (isVisibleElement(rectangleShapeButton)) {
+            rectangleShapeButton.click();
+            return;
+        }
+
+        const rectanglePopover = window.document.querySelector('.cvat-draw-rectangle-popover');
+        if (isVisibleElement(rectanglePopover)) {
+            window.setTimeout(() => {
+                const delayedShapeButton = window.document.querySelector(
+                    '.cvat-draw-rectangle-popover .cvat-draw-rectangle-shape-button',
+                ) as HTMLButtonElement | null;
+                if (isVisibleElement(delayedShapeButton)) {
+                    delayedShapeButton.click();
+                }
+            }, 0);
+            return;
+        }
+
+        const rectangleControl = window.document.querySelector(
+            '.cvat-draw-rectangle-control:not(.cvat-disabled-canvas-control)',
+        ) as HTMLElement | null;
+        if (rectangleControl) {
+            rectangleControl.click();
         }
     };
 
@@ -324,6 +366,9 @@ export default function ControlsSideBarComponent(props: Props): JSX.Element {
             },
             SWITCH_DRAW_MODE_STANDARD_CONTROLS: (event: KeyboardEvent | undefined) => {
                 handleDrawMode(event, 'draw');
+            },
+            DRAW_RECTANGLE_SHAPE_STANDARD_CONTROLS: (event: KeyboardEvent | undefined) => {
+                triggerRectangleShapeShortcut(event);
             },
             SWITCH_REDRAW_MODE_STANDARD_CONTROLS: (event: KeyboardEvent | undefined) => {
                 handleDrawMode(event, 'redraw');

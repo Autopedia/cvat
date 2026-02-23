@@ -496,6 +496,25 @@ export function restoreSettingsAsync(): ThunkAction {
                 ));
             }
 
+            // Keep "r" reserved for rectangle quick draw and migrate old
+            // NEXT_KEY_FRAME mapping that conflicts with it.
+            if (
+                updateKeyMap.NEXT_KEY_FRAME?.sequences.includes('r') &&
+                updateKeyMap.DRAW_RECTANGLE_SHAPE_STANDARD_CONTROLS?.sequences.includes('r')
+            ) {
+                updateKeyMap.NEXT_KEY_FRAME.sequences = updateKeyMap.NEXT_KEY_FRAME.sequences.map((sequence) => (
+                    sequence === 'r' ? 'shift+r' : sequence
+                ));
+            }
+
+            // Migrate old draw mode mapping ("n" only) to include "a" as Done.
+            if (
+                updateKeyMap.SWITCH_DRAW_MODE_STANDARD_CONTROLS?.sequences.includes('n') &&
+                !updateKeyMap.SWITCH_DRAW_MODE_STANDARD_CONTROLS.sequences.includes('a')
+            ) {
+                updateKeyMap.SWITCH_DRAW_MODE_STANDARD_CONTROLS.sequences.push('a');
+            }
+
             const resolvedKeyMap = resolveConflicts(updateKeyMap, shortcuts.keyMap);
 
             dispatch(shortcutsActions.registerShortcuts(resolvedKeyMap));

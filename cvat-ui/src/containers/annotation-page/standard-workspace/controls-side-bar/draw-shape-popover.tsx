@@ -184,7 +184,12 @@ class DrawShapePopoverContainer extends React.PureComponent<Props, State> {
     };
 
     private onChangeLabel = (value: Label): void => {
-        this.setState({ selectedLabelID: value.id as number });
+        this.setState({ selectedLabelID: value.id as number }, () => {
+            const { activeElement } = window.document;
+            if (activeElement instanceof HTMLElement) {
+                activeElement.blur();
+            }
+        });
     };
 
     public render(): JSX.Element {

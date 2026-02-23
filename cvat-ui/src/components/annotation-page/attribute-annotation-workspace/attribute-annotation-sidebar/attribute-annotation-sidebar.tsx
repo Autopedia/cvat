@@ -85,7 +85,7 @@ const componentShortcuts = {
     NEXT_KEY_FRAME: {
         name: 'Next keyframe',
         description: 'Go to the next keyframe of an active track',
-        sequences: ['r'],
+        sequences: ['shift+r'],
         scope: ShortcutScope.OBJECTS_SIDEBAR,
     },
     PREV_KEY_FRAME: {

@@ -90,12 +90,6 @@ const core = getCore();
 const CustomPopover = withVisibilityHandling(Popover, 'tools-control');
 
 const componentShortcuts = {
-    OPEN_AI_TOOLS_STANDARD_CONTROLS: {
-        name: 'Open AI tools',
-        description: 'Open AI tools panel (Magic Wand)',
-        sequences: ['w'],
-        scope: ShortcutScope.STANDARD_WORKSPACE_CONTROLS,
-    },
     AI_TOOLS_INTERACT_TOGGLE_STANDARD_CONTROLS: {
         name: 'AI tools interact toggle',
         description: 'Toggle AI tools panel / start Interact',
@@ -1132,7 +1126,12 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
                             style={{ width: '100%' }}
                             labels={labels}
                             value={activeLabelID}
-                            onChange={(value: any) => this.setState({ activeLabelID: value.id })}
+                            onChange={(value: any) => this.setState({ activeLabelID: value.id }, () => {
+                                const { activeElement } = window.document;
+                                if (activeElement instanceof HTMLElement) {
+                                    activeElement.blur();
+                                }
+                            })}
                         />
                     </Col>
                 </Row>
@@ -1533,10 +1532,6 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
             };
 
         const shortcutHandlers: Record<keyof typeof componentShortcuts, (event?: KeyboardEvent) => void> = {
-            OPEN_AI_TOOLS_STANDARD_CONTROLS: (event: KeyboardEvent | undefined): void => {
-                if (event) event.preventDefault();
-                this.openAIToolsPopover();
-            },
             AI_TOOLS_INTERACT_TOGGLE_STANDARD_CONTROLS: (event: KeyboardEvent | undefined): void => {
                 if (event) event.preventDefault();
                 this.handleAIToolsInteractToggle();
