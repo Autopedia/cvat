@@ -485,6 +485,17 @@ export function restoreSettingsAsync(): ThunkAction {
                 }
             });
 
+            // Keep "e" reserved for AI tools interaction and migrate old
+            // PREV_KEY_FRAME mapping that conflicts with it.
+            if (
+                updateKeyMap.PREV_KEY_FRAME?.sequences.includes('e') &&
+                updateKeyMap.AI_TOOLS_INTERACT_TOGGLE_STANDARD_CONTROLS?.sequences.includes('e')
+            ) {
+                updateKeyMap.PREV_KEY_FRAME.sequences = updateKeyMap.PREV_KEY_FRAME.sequences.map((sequence) => (
+                    sequence === 'e' ? 'shift+e' : sequence
+                ));
+            }
+
             const resolvedKeyMap = resolveConflicts(updateKeyMap, shortcuts.keyMap);
 
             dispatch(shortcutsActions.registerShortcuts(resolvedKeyMap));

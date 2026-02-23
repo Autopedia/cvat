@@ -177,7 +177,7 @@ const componentShortcuts = {
     PREV_KEY_FRAME: {
         name: 'Previous keyframe',
         description: 'Go to the previous keyframe of an active track',
-        sequences: ['e'],
+        sequences: ['shift+e'],
         scope: ShortcutScope.OBJECTS_SIDEBAR,
     },
     CHANGE_OBJECT_COLOR: {

@@ -32,6 +32,10 @@ import {
     interactWithCanvas,
     createAnnotationsAsync,
 } from 'actions/annotation-actions';
+import GlobalHotKeys, { KeyMap } from 'utils/mousetrap-react';
+import { subKeyMap } from 'utils/component-subkeymap';
+import { registerComponentShortcuts } from 'actions/shortcuts-actions';
+import { ShortcutScope } from 'utils/enums';
 import LabelSelector from 'components/label-selector/label-selector';
 import CVATTooltip from 'components/common/cvat-tooltip';
 import ApproximationAccuracy, {
@@ -47,6 +51,7 @@ interface Props {
     labels: any[];
     canvasInstance: Canvas;
     canvasReady: boolean;
+    keyMap: KeyMap;
     jobInstance: Job;
     isActivated: boolean;
     frame: number;
@@ -77,6 +82,16 @@ interface State {
 
 const core = getCore();
 const CustomPopover = withVisibilityHandling(Popover, 'opencv-control');
+const componentShortcuts = {
+    TOGGLE_HISTOGRAM_EQUALIZATION_STANDARD_CONTROLS: {
+        name: 'Toggle histogram equalization',
+        description: 'Toggle OpenCV histogram equalization image filter',
+        sequences: ['q'],
+        scope: ShortcutScope.STANDARD_WORKSPACE_CONTROLS,
+    },
+};
+
+registerComponentShortcuts(componentShortcuts);
 
 function mapStateToProps(state: CombinedState): Props {
     const {
@@ -94,6 +109,7 @@ function mapStateToProps(state: CombinedState): Props {
             workspace: { defaultApproxPolyAccuracy, toolsBlockerState },
             imageFilters: filters,
         },
+        shortcuts: { keyMap },
     } = state;
 
     return {
@@ -109,6 +125,7 @@ function mapStateToProps(state: CombinedState): Props {
         frameData,
         toolsBlockerState,
         filters,
+        keyMap,
     };
 }
 
@@ -325,6 +342,30 @@ class OpenCVControlComponent extends React.PureComponent<Props & DispatchToProps
         }
     }
 
+    private toggleHistogramEqualization = async (event?: KeyboardEvent | React.MouseEvent<HTMLElement>): Promise<void> => {
+        const { enableImageFilter, disableImageFilter, filters } = this.props;
+
+        if (hasFilter(filters, ImageFilterAlias.HISTOGRAM_EQUALIZATION)) {
+            if (event && 'target' in event && event.target instanceof HTMLElement) {
+                event.target.blur();
+            }
+            disableImageFilter(ImageFilterAlias.HISTOGRAM_EQUALIZATION);
+            return;
+        }
+
+        if (!openCVWrapper.isInitialized || openCVWrapper.initializationInProgress) {
+            await this.initializeOpenCV();
+            if (!openCVWrapper.isInitialized) {
+                return;
+            }
+        }
+
+        enableImageFilter({
+            modifier: openCVWrapper.imgproc.hist(),
+            alias: ImageFilterAlias.HISTOGRAM_EQUALIZATION,
+        });
+    };
+
     private renderDrawingContent(): JSX.Element {
         const { activeLabelID } = this.state;
         const { labels, canvasInstance, onInteractionStart } = this.props;
@@ -368,7 +409,7 @@ class OpenCVControlComponent extends React.PureComponent<Props & DispatchToProps
     }
 
     private renderImageContent():JSX.Element {
-        const { enableImageFilter, disableImageFilter, filters } = this.props;
+        const { filters } = this.props;
         return (
             <Row justify='start'>
                 <Col>
@@ -379,16 +420,7 @@ class OpenCVControlComponent extends React.PureComponent<Props & DispatchToProps
                                     'cvat-opencv-histogram-tool-button cvat-opencv-image-tool-active' : 'cvat-opencv-histogram-tool-button'
                             }
                             onClick={(e: React.MouseEvent<HTMLElement>) => {
-                                if (!hasFilter(filters, ImageFilterAlias.HISTOGRAM_EQUALIZATION)) {
-                                    enableImageFilter({
-                                        modifier: openCVWrapper.imgproc.hist(),
-                                        alias: ImageFilterAlias.HISTOGRAM_EQUALIZATION,
-                                    });
-                                } else {
-                                    const button = e.target as HTMLElement;
-                                    button.blur();
-                                    disableImageFilter(ImageFilterAlias.HISTOGRAM_EQUALIZATION);
-                                }
+                                void this.toggleHistogramEqualization(e);
                             }}
                         >
                             <AreaChartOutlined />
@@ -529,9 +561,15 @@ class OpenCVControlComponent extends React.PureComponent<Props & DispatchToProps
 
     public render(): JSX.Element {
         const {
-            isActivated, canvasInstance, labels, frameData,
+            isActivated, canvasInstance, labels, frameData, keyMap,
         } = this.props;
         const { libraryInitialized, approxPolyAccuracy } = this.state;
+        const shortcutHandlers: Record<keyof typeof componentShortcuts, (event?: KeyboardEvent) => void> = {
+            TOGGLE_HISTOGRAM_EQUALIZATION_STANDARD_CONTROLS: (event: KeyboardEvent | undefined): void => {
+                if (event) event.preventDefault();
+                void this.toggleHistogramEqualization(event);
+            },
+        };
         const dynamicPopoverProps = isActivated ?
             {
                 overlayStyle: {
@@ -555,6 +593,7 @@ class OpenCVControlComponent extends React.PureComponent<Props & DispatchToProps
             <Icon className='cvat-opencv-control cvat-disabled-canvas-control' component={OpenCVIcon} />
         ) : (
             <>
+                <GlobalHotKeys keyMap={subKeyMap(componentShortcuts, keyMap)} handlers={shortcutHandlers} />
                 <CustomPopover
                     {...dynamicPopoverProps}
                     placement='right'
