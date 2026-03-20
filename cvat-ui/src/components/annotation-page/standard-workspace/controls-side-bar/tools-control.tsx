@@ -1082,12 +1082,21 @@ export class ToolsControlComponent extends React.PureComponent<Props, State> {
         left: number,
         top: number,
     ): Promise<[number, number][]> {
+        if (!mask.length || !mask[0]?.length) {
+            return [];
+        }
+
         await this.initializeOpenCV();
 
         const src = openCVWrapper.mat.fromData(mask[0].length, mask.length, MatType.CV_8UC1, mask.flat());
         try {
             const polygons = openCVWrapper.contours.findContours(src, true);
-            return polygons[0].reduce<[number, number][]>((acc, _, idx, array) => {
+            const polygon = polygons.find((candidate) => candidate?.length);
+            if (!polygon) {
+                return [];
+            }
+
+            return polygon.reduce<[number, number][]>((acc, _, idx, array) => {
                 if (idx % 2) {
                     acc.push([array[idx - 1] + left, array[idx] + top]);
                 }
