@@ -43,9 +43,14 @@ do trainings and a dedicated support with 24 hour SLA.
 - Share path (`/home/django/share`) is mapped to `/mnt/dataset/cvat-volume/share` via `cvat/docker-compose.nfs-share.yml`.
 - CVAT data path (`/home/django/data`) is mapped to `/mnt/dataset/cvat-volume/container-volumes/cvat_data` via `cvat/docker-compose.nfs-volumes.yml`.
 - Redis on-disk cache (`/var/lib/kvrocks`) is mapped to `/mnt/dataset/cvat-volume/container-volumes/cvat_cache_db` via `cvat/docker-compose.nfs-volumes.yml`.
+- This host intentionally does not use `/etc/fstab` for the NFS mount. To avoid partial boot after a reboot, `cvat/docker-compose.manual-nfs.yml` overrides the stack restart policy to `on-failure`, so Docker daemon restart does not auto-restore the full CVAT + Nuclio stack before `/mnt/dataset` is mounted.
 - Re-run with:
   - `cd /raid/projects/cvat_atrace/cvat`
-  - `docker compose -f docker-compose.yml -f docker-compose.nfs-share.yml -f docker-compose.nfs-volumes.yml up -d --remove-orphans`
+  - `docker compose -f docker-compose.yml -f docker-compose.nfs-share.yml -f docker-compose.nfs-volumes.yml -f components/serverless/docker-compose.serverless.yml -f docker-compose.manual-nfs.yml up -d --remove-orphans`
+- Recommended boot recovery order:
+  - mount `/mnt/dataset` manually
+  - `cd /raid/projects/cvat_atrace/cvat_custom_action`
+  - `./run_cvat.sh --skip-down`
 
 - [Installation guide](https://docs.cvat.ai/docs/administration/basics/installation/)
 - [Manual](https://docs.cvat.ai/docs/manual/)

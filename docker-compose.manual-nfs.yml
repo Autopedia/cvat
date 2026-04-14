@@ -1,0 +1,57 @@
+services:
+  cvat_db:
+    restart: on-failure
+
+  cvat_redis_inmem:
+    restart: on-failure
+
+  cvat_redis_ondisk:
+    restart: on-failure
+
+  cvat_server:
+    restart: on-failure
+
+  cvat_worker_utils:
+    restart: on-failure
+
+  cvat_worker_import:
+    restart: on-failure
+
+  cvat_worker_export:
+    restart: on-failure
+
+  cvat_worker_annotation:
+    restart: on-failure
+
+  cvat_worker_webhooks:
+    restart: on-failure
+
+  cvat_worker_quality_reports:
+    restart: on-failure
+
+  cvat_worker_chunks:
+    restart: on-failure
+
+  cvat_worker_consensus:
+    restart: on-failure
+
+  cvat_ui:
+    restart: on-failure
+
+  nuclio:
+    restart: on-failure
+
+  traefik:
+    restart: on-failure
+
+  cvat_opa:
+    restart: on-failure
+
+  cvat_clickhouse:
+    restart: on-failure
+
+  cvat_vector:
+    restart: on-failure
+
+  cvat_grafana:
+    restart: on-failure
